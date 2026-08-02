@@ -25,6 +25,7 @@ git apply <本repo>/patches/0001-manage-cli-no-r2-degraded-mode.patch
 git apply <本repo>/patches/0002-media-endpoints-nonfatal.patch
 git apply <本repo>/patches/0003-remove-version-metadata-binding.patch
 git apply <本repo>/patches/0004-local-d1-database-name.patch
+git apply <本repo>/patches/0005-vitest-env-isolation.patch   # init 自跑上游測試會被 MICROFEED_DISABLE_R2 污染（C run 1 實測 4 筆 fail 中止 init）——測試環境擦除該變數
 corepack yarn install
 ```
 
@@ -66,3 +67,7 @@ MICROFEED_DISABLE_R2=1 corepack yarn manage init \
 ## 維護與移除
 
 照 `.smallgreen/maintenance.yaml`。**移除前必先 `wrangler d1 export`（內容是珍貴資料）**；移除走上游 `yarn manage destroy --instance <name>`——先 `--dry-run` 審計畫再 `--confirm <name>`（該指令拒絕 `--yes`，需明給 confirm 名）。
+
+## 重入指引（init 中途死掉時）
+
+init 若在測試/部署階段中止（timeout、gate fail），D1 可能已建成——**重跑必補 `--reuse-d1`**（旗標見 E54 清單），否則撞資源已存在。POST 端點與 feed 路徑同樣有尾斜線 308 雷（/admin/login/set_password/complete/ 這類要帶尾斜線）。

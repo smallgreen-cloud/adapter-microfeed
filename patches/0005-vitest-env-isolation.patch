@@ -1,0 +1,15 @@
+diff --git a/vitest.config.ts b/vitest.config.ts
+index 4ab118e..536469e 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -9,6 +9,10 @@ export default defineConfig({
+     },
+   },
+   test: {
++    // SmallGreen adapter: init 的 runChecks 以 ...process.env 起測試子程序，部署 shell 的
++    // MICROFEED_DISABLE_R2 會洩入 vitest 讓降級行為在上游單測內生效（4 筆 fail 中止 init）。
++    // 僅在測試環境擦除，部署環境不動（C run E69 實測）。
++    env: {MICROFEED_DISABLE_R2: ""},
+     exclude: ["tests/worker/**", "node_modules/**", "dist/**"],
+     globals: true,
+     include: ["tests/unit/**/*.test.ts"],
