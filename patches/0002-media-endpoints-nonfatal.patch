@@ -1,0 +1,33 @@
+diff --git a/src/pages/media-upload/[...key].ts b/src/pages/media-upload/[...key].ts
+index 53a2dc9..7892424 100644
+--- a/src/pages/media-upload/[...key].ts
++++ b/src/pages/media-upload/[...key].ts
+@@ -11,6 +11,11 @@ const corsHeaders = {
+ };
+ 
+ export const PUT: APIRoute = async ({params, request, url}) => {
++  if (!env.MEDIA_BUCKET) {
++    return new Response("Media storage is disabled on this deployment", {
++      status: 503,
++    });
++  }
+   const objectKey = params.key ? normalizeObjectKey(params.key) : null;
+   const contentType = url.searchParams.get("content-type") ?? "";
+   const sizeValue = url.searchParams.get("size") ?? "";
+diff --git a/src/server/media/media.ts b/src/server/media/media.ts
+index 265f716..e60b2e4 100644
+--- a/src/server/media/media.ts
++++ b/src/server/media/media.ts
+@@ -106,6 +106,12 @@ export async function getMediaResponse(
+     return new Response("Not Found", {status: 404});
+   }
+ 
++  if (!runtimeEnv.MEDIA_BUCKET) {
++    return new Response("Media storage is disabled on this deployment", {
++      status: 503,
++    });
++  }
++
+   if (request.method === "HEAD") {
+     const object = await runtimeEnv.MEDIA_BUCKET.head(key);
+     if (!object) {

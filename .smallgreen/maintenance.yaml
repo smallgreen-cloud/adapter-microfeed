@@ -1,0 +1,30 @@
+schema_version: "0.1.0"
+update:
+  strategy: upstream-pr
+  upstream_check: gh api repos/microfeed/microfeed/commits/main --jq .sha（與 UPSTREAM.md 鎖定值比對；重點審 manage-cli/lib/cloudflare.ts 的 r2BucketExists/createR2/deploy 呼叫點 vs patch 0001 覆蓋面、MEDIA_BUCKET 觸點增減 vs patch 0002、wrangler 設定資源 key vs patch 0003）
+  preview_before_promote: true
+backup:
+  targets: [d1]
+  method: 內容與 admin 帳號＝珍貴資料。npx wrangler d1 export <name>-db --remote --output backup.sql（升級與移除前必做；D1 名為 init 時 --d1-name 的值）
+restore:
+  method: npx wrangler d1 execute <name>-db --remote --file backup.sql；程式碼 git revert 後 yarn manage deploy 重新部署
+  d1_time_travel_note: D1 Time Travel 免費層可回溯 30 天
+uninstall:
+  steps:
+    - 先 npx wrangler d1 export <name>-db --remote --output backup.sql
+    - MICROFEED_DISABLE_R2=1 corepack yarn manage destroy --instance <name> --dry-run（先審只讀刪除計畫）
+    - MICROFEED_DISABLE_R2=1 corepack yarn manage destroy --instance <name> --confirm <name>（刪 Worker＋D1＋本地狀態；secrets 隨 Worker 移除；降級模式無 R2 bucket 可刪——r2BucketExists 回 false 即跳過）
+    - 刪除本地 clone（.microfeed/ instance 狀態在 clone 內，隨之移除）
+  data_export_first: true
+quota_watchdog:
+  watch:
+    - resource: workers_requests
+      free_limit: 100,000 requests/day（前台頁面、feed、media 404/503、admin 全走同一 Worker）
+      check_method: dashboard → Workers → <name> → metrics
+      alert_threshold: "80%"
+    - resource: d1_rows_read
+      free_limit: 5,000,000 rows read/day（每次頁面/feed 載入讀 channels＋items＋settings）
+      check_method: dashboard → Storage & Databases → D1 → metrics
+    - resource: d1_storage
+      free_limit: 5 GB total（純文字內容極難撞；長期大量 items 才需留意）
+      check_method: dashboard → Storage & Databases → D1 → <name>-db

@@ -1,0 +1,83 @@
+# microfeed（Cloudflare）適配契約（Path C，無 R2 降級版）。上游程式碼不在本 repo——組裝流程見 AGENTS.md。
+schema_version: "0.2.0"
+profile: small-app
+summary:
+  purpose: 自架輕量 CMS 與 feed 平台（部落格、podcast、影音清單），前台輸出網頁＋JSON feed＋RSS，內容存自己帳號的 D1
+  audience: 個人發布者與小型內容站
+  users_estimate: 1-10
+upstream:
+  repo: microfeed/microfeed
+  commit: fa0dcbd2ccd63444f704b8902b6850398b664d2b
+  license: AGPL-3.0
+login_method: other
+data:
+  types: [feed_items, channel_settings, admin_accounts]
+  stored_in: [d1]
+  notes: 內容（items、channel 設定）與 admin 帳號存 D1（珍貴資料）。login_method=other 說明——admin 後台走上游內建 better-auth email＋密碼（存 D1 auth_user 表，migrations/0002_better_auth.sql）；首組密碼由 CLI 產生 30 分鐘一次性連結設定，設定前後台回 403（manage-cli/commands.ts issuePasswordSetupLink）；亦可 --admin-auth none 配 Cloudflare Access（yarn manage access）。本 adapter 為無 R2 降級版——patch 0001 以 MICROFEED_DISABLE_R2=1 讓 init 跳過 R2 前置檢查與建桶、部署設定剝除 MEDIA_BUCKET binding（R2 未開通帳號的 10042 適配，B run E52）；媒體上傳與媒體檔服務停用，端點回 503（patch 0002 防呆）。文字內容全功能不受影響
+secrets:
+  - name: UPLOAD_SIGNING_KEY
+    purpose: 媒體上傳簽名 URL 的 HMAC key（必要 secret——CLI 部署時自動產生注入；降級模式仍需存在，簽名端點照常運作，實際上傳被 503 擋）
+    required: true
+    how_to_obtain: yarn manage init 自動產生（--secrets-file 注入）；手動部署時自行產 32 bytes 亂數
+    free_tier: true
+  - name: BETTER_AUTH_SECRET
+    purpose: better-auth session 簽章 secret（admin-auth=built-in 時必要——CLI 部署時自動產生注入）
+    required: true
+    how_to_obtain: yarn manage init 自動產生（--secrets-file 注入）；手動部署時自行產 32 bytes 亂數
+    free_tier: true
+  - name: MICROFEED_DISABLE_R2
+    purpose: 選配——本 adapter patch 0001 的降級開關（CLI 端 process.env，非 worker secret）。設 1 即無 R2 部署；不設即上游完整行為（帳號可用 R2 時）
+    required: false
+    how_to_obtain: 部署 shell 環境變數 export MICROFEED_DISABLE_R2=1
+    free_tier: true
+  - name: MICROFEED_ADMIN_PATH
+    purpose: 選配——admin 後台路徑 wrangler var（CLI 由 --admin-path 生成，預設 admin。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: yarn manage init --admin-path <path> 生成
+    free_tier: true
+  - name: MICROFEED_ADMIN_AUTH_MODE
+    purpose: 選配——admin 認證模式 wrangler var（built-in 或 none，CLI 由 --admin-auth 生成。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: yarn manage init --admin-auth built-in 生成
+    free_tier: true
+  - name: MICROFEED_INSTANCE_ID
+    purpose: 選配——安裝識別 UUID wrangler var（CLI 生成，部署驗證用。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: yarn manage init 自動生成
+    free_tier: true
+  - name: CLOUDFLARE_PROJECT_NAME
+    purpose: 選配——專案名 wrangler var（CLI 生成。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: yarn manage init 自動生成
+    free_tier: true
+  - name: DEPLOYMENT_ENVIRONMENT
+    purpose: 選配——production/preview 環境標記 wrangler var（CLI 生成。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: yarn manage init 自動生成
+    free_tier: true
+  - name: MICROFEED_INSTANCE
+    purpose: 選配——manage CLI 的本地 instance 選擇環境變數（非 worker runtime。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: 多 instance 時 export MICROFEED_INSTANCE=<name>
+    free_tier: true
+  - name: MICROFEED_STATE_DIRECTORY
+    purpose: 選配——manage CLI 的 .microfeed 狀態目錄覆寫（非 worker runtime。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: 需要時 export 指向自訂目錄
+    free_tier: true
+  - name: MICROFEED_WRANGLER_CONFIG
+    purpose: 選配——astro build 讀取的 wrangler 設定路徑覆寫（build 期，非 worker runtime。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: manage CLI 自動設定
+    free_tier: true
+  - name: MICROFEED_LOCAL_STATE
+    purpose: 選配——本地開發持久化路徑覆寫（build/dev 期，非 worker runtime。列此供 CON-3 對帳）
+    required: false
+    how_to_obtain: manage CLI 自動設定
+    free_tier: true
+external_services: []
+resource_usage:
+  - resource: r2
+    required: false
+    feature: 媒體上傳與媒體檔服務（本 adapter 預設降級停用——MICROFEED_DISABLE_R2=1 部署不帶 MEDIA_BUCKET binding；帳號 R2 可用時不設該變數即回復完整功能，無需撤 patch）
+alt_deployment: []

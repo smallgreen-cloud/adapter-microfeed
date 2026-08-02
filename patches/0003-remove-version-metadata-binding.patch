@@ -1,0 +1,56 @@
+diff --git a/src/pages/.well-known/microfeed.json.ts b/src/pages/.well-known/microfeed.json.ts
+index 20f21e2..75f09c5 100644
+--- a/src/pages/.well-known/microfeed.json.ts
++++ b/src/pages/.well-known/microfeed.json.ts
+@@ -9,7 +9,9 @@ export const GET: APIRoute = async () => {
+     env.FEED_DB,
+     env.MICROFEED_INSTANCE_ID,
+   );
++  // The Workers version metadata binding is not declared, so no deployment
++  // timestamp is available. Consumers treat deployedAt as informational.
+   return Response.json(
+-    microfeedIdentity(instanceId, env.CF_VERSION_METADATA.timestamp),
++    microfeedIdentity(instanceId, ""),
+   );
+ };
+diff --git a/tests/unit/manage-cli/WranglerTemplate.test.ts b/tests/unit/manage-cli/WranglerTemplate.test.ts
+index 9fb8a4c..e933623 100644
+--- a/tests/unit/manage-cli/WranglerTemplate.test.ts
++++ b/tests/unit/manage-cli/WranglerTemplate.test.ts
+@@ -47,7 +47,7 @@ describe("Wrangler configuration template", () => {
+     };
+ 
+     expect(config.observability?.enabled).toBe(false);
+-    expect(config.version_metadata?.binding).toBe("CF_VERSION_METADATA");
++    expect(config.version_metadata).toBeUndefined();
+   });
+ 
+   it("enables workers.dev until a custom domain is configured", () => {
+diff --git a/wrangler.jsonc b/wrangler.jsonc
+index d3cd0a5..f6e726b 100644
+--- a/wrangler.jsonc
++++ b/wrangler.jsonc
+@@ -14,9 +14,6 @@
+   "observability": {
+     "enabled": false
+   },
+-  "version_metadata": {
+-    "binding": "CF_VERSION_METADATA"
+-  },
+   "d1_databases": [
+     {
+       "binding": "FEED_DB",
+diff --git a/wrangler.template.jsonc b/wrangler.template.jsonc
+index ea91c7c..ef6b26a 100644
+--- a/wrangler.template.jsonc
++++ b/wrangler.template.jsonc
+@@ -12,9 +12,6 @@
+   "observability": {
+     "enabled": false
+   },
+-  "version_metadata": {
+-    "binding": "CF_VERSION_METADATA"
+-  },
+   "secrets": {
+     "required": __REQUIRED_SECRETS__
+   },

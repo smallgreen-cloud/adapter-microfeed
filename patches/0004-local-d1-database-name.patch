@@ -1,0 +1,12 @@
+diff --git a/wrangler.jsonc b/wrangler.jsonc
+index f6e726b..7191e38 100644
+--- a/wrangler.jsonc
++++ b/wrangler.jsonc
+@@ -17,6 +17,7 @@
+   "d1_databases": [
+     {
+       "binding": "FEED_DB",
++      "database_name": "microfeed",
+       "migrations_dir": "./migrations"
+     }
+   ],

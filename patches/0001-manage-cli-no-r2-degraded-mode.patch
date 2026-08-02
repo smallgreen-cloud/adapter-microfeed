@@ -1,0 +1,85 @@
+diff --git a/manage-cli/lib/cloudflare.ts b/manage-cli/lib/cloudflare.ts
+index a5d29ba..8ff31d6 100644
+--- a/manage-cli/lib/cloudflare.ts
++++ b/manage-cli/lib/cloudflare.ts
+@@ -1,3 +1,5 @@
++import {readFile, writeFile} from "node:fs/promises";
++
+ import {
+   normalizeAdminAuthMode,
+   type AdminAuthMode,
+@@ -23,6 +25,30 @@ export const OAUTH_SCOPES = [
+   "zone:read",
+ ] as const;
+ 
++// Degraded no-R2 mode: some accounts cannot use R2 at all (Cloudflare API
++// error 10042). With MICROFEED_DISABLE_R2=1, initialization skips every R2
++// check and creation, and the Worker deploys without the MEDIA_BUCKET
++// binding. Media uploads and media serving are unavailable at runtime.
++export function mediaStorageDisabled(): boolean {
++  return process.env.MICROFEED_DISABLE_R2 === "1";
++}
++
++async function stripBuiltR2Bindings(): Promise<void> {
++  const raw = await readFile(builtWranglerConfigPath, "utf8");
++  const config = JSON.parse(raw) as Record<string, unknown>;
++  if (!("r2_buckets" in config)) {
++    return;
++  }
++  const stripped = Object.fromEntries(
++    Object.entries(config).filter(([key]) => key !== "r2_buckets"),
++  );
++  await writeFile(
++    builtWranglerConfigPath,
++    `${JSON.stringify(stripped, null, 2)}\n`,
++    "utf8",
++  );
++}
++
+ function parseJsonOutput<T>(output: string): T {
+   const lines = output.trim().split(/\r?\n/u);
+   for (let index = 0; index < lines.length; index += 1) {
+@@ -727,6 +753,9 @@ export class CloudflareClient {
+   }
+ 
+   async r2BucketExists(accountId: string, name: string): Promise<boolean> {
++    if (mediaStorageDisabled()) {
++      return false;
++    }
+     const result = await runWrangler(
+       this.runner,
+       ["r2", "bucket", "info", name, "--json"],
+@@ -742,6 +771,13 @@ export class CloudflareClient {
+     if (detail.includes("not found") || detail.includes("does not exist")) {
+       return false;
+     }
++    if (detail.includes("10042")) {
++      throw new Error(
++        "This Cloudflare account cannot use R2 (error 10042). Rerun the " +
++          "command with MICROFEED_DISABLE_R2=1 to deploy without media " +
++          "storage, or enable R2 for the account first.",
++      );
++    }
+     throw new Error(result.stderr.trim() || "Unable to check R2 bucket.");
+   }
+ 
+@@ -805,6 +841,9 @@ export class CloudflareClient {
+   }
+ 
+   async createR2(accountId: string, name: string): Promise<void> {
++    if (mediaStorageDisabled()) {
++      return;
++    }
+     await runWrangler(
+       this.runner,
+       ["r2", "bucket", "create", name, "--no-update-config"],
+@@ -930,6 +969,9 @@ export class CloudflareClient {
+     config: MicrofeedConfig,
+     secretsFile?: string,
+   ): Promise<string | null> {
++    if (mediaStorageDisabled()) {
++      await stripBuiltR2Bindings();
++    }
+     const args = [
+       "deploy",
+       "--strict",

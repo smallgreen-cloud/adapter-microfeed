@@ -1,0 +1,12 @@
+name: conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  adapter-conformance:
+    uses: smallgreen-cloud/conformance/.github/workflows/adapter-conformance.yml@main
+    with:
+      spec_ref: v0.2.1

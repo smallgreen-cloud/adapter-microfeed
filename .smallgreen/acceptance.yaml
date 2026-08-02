@@ -1,0 +1,48 @@
+schema_version: "0.1.0"
+health:
+  path: /
+  expect_status: 200
+smoke:
+  - name: 前端載入
+    steps:
+      - action: http_request
+        params: { method: GET, path: / }
+    expect: { status: 200 }
+    idempotency: true
+  - name: JSON feed
+    steps:
+      - action: http_request
+        params: { method: GET, path: /json/ }
+    expect: { status: 200, body_contains: "jsonfeed.org/version" }
+    idempotency: true
+  - name: RSS feed
+    steps:
+      - action: http_request
+        params: { method: GET, path: /rss/ }
+    expect: { status: 200, body_contains: "<rss" }
+    idempotency: true
+  - name: 安裝識別端點
+    steps:
+      - action: http_request
+        params: { method: GET, path: /.well-known/microfeed.json }
+    expect: { status: 200, body_contains: "microfeed" }
+    idempotency: true
+  - name: 未認證寫入被拒
+    steps:
+      - action: http_request
+        params: { method: POST, path: /api/items/, json: {} }
+    expect: { status: 401 }
+    idempotency: true
+user_acceptance:
+  - task: 完成 init 後，開 CLI 印出的一次性連結（30 分鐘、單次有效）設 admin 密碼，以 --owner-email 的 email 登入 /admin/
+    success_looks_like: 設密碼前 /admin/ 回 403；設定後登入成功進 dashboard（better-auth，D1 auth_user）
+  - task: admin 後台建一筆純文字 item（不附媒體）並發布
+    success_looks_like: 建立成功；前台 / 與 /i/<slug>/ 顯示該 item
+  - task: 驗證 feed 輸出含該 item
+    success_looks_like: /json/ 的 items 含該 title；/rss/ 為合法 XML（過 RSS validator）且含該 item
+  - task: admin 嘗試上傳一張圖片（降級驗證點）
+    success_looks_like: 簽名 URL 可取得，但 PUT /media-upload/... 回 503「Media storage is disabled on this deployment」＝降級如實（patch 0002 行為，非 500 崩潰）；文字內容功能不受影響
+  - task: 未帶認證打 POST /api/items/
+    success_looks_like: 401＝admin API 認證生效
+uninstall_check:
+  resource_zero_diff: true
