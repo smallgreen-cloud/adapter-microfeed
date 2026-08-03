@@ -64,6 +64,8 @@ MICROFEED_DISABLE_R2=1 corepack yarn manage init \
 
 全過才算完成（Build 成功不算）。
 
+**API 認證面注意（截圖批次實測）**：`POST /api/items/` 只認 `x-microfeedapi-key` 標頭且需先在後台啟用 API settings，**不吃 admin session cookie**（src/middleware.ts:86-106）。以 admin 登入態建 item 要走後台端點 `POST /admin/ajax/feed/`，body 形如 `{"item":{"id":"<11 字元 shortUUID>","status":1,"pubDateMs":<ms>,"title":"...","description":"<HTML>","link":"/i/<slug>-<id>/"}}`；channel 設定同端點以 `{"channel":{...}}` 更新。另：預設佈景首頁 Latest 清單只列標題與日期（無摘要欄位），站介紹靠 channel description 呈現。
+
 ## 維護與移除
 
 照 `.smallgreen/maintenance.yaml`。**移除前必先 `wrangler d1 export`（內容是珍貴資料）**；移除走上游 `yarn manage destroy --instance <name>`——先 `--dry-run` 審計畫再 `--confirm <name>`（該指令拒絕 `--yes`，需明給 confirm 名）。
